@@ -8,7 +8,7 @@ Plataforma privada de monitoreo de medios, prellenado asistido por OpenAI, revis
 - Registro por día de hasta **50 URLs de YouTube** (una por línea), con medio, etapa y programa.
 - Extracción *intentada* de subtítulos de YouTube con marcas de tiempo (español, español de México, inglés).
 - **Importación manual alternativa de SRT/VTT**, indispensable cuando YouTube bloquea la recuperación desde Render.
-- Cola de trabajos en PostgreSQL, procesada por un servicio worker independiente.
+- Cola de trabajos en PostgreSQL; worker embebido experimental en Render Free y worker independiente en configuración de producción.
 - Análisis de tramos de 10 minutos mediante OpenAI y `Structured Outputs`, vinculado a segmentos temporales.
 - Menciones con emisor, sujeto, cita, contexto, tiempos, género periodístico, tema, valoración y hallazgos de 25 categorías cualitativas.
 - Pantalla de revisión con reproductor de YouTube que inicia en el fragmento y acceso directo a la fuente.
@@ -17,22 +17,28 @@ Plataforma privada de monitoreo de medios, prellenado asistido por OpenAI, revis
 - Analítica por etapa y exportación CSV de **menciones aprobadas**.
 - Etapa `prueba` separada de la estadística oficial (ideal para ensayar con una conferencia matutina).
 
-## Despliegue en Render.com
+## Cómo probar SIN registrar tarjeta en Render
 
-1. Sube la carpeta completa a un repositorio GitHub privado. No incluyas `.env` ni claves API en Git.
-2. En Render, elige **New → Blueprint** y conecta el repositorio. Detectará `render.yaml`.
-3. El Blueprint crea un **Web Service**, un **Background Worker** y **Render Postgres**. En Render configura las variables solicitadas **en ambos servicios cuando corresponda**:
-   - `ADMIN_PASSWORD`: contraseña fuerte de administrador (servicio web).
-   - `REVIEWER_PASSWORD`: contraseña fuerte de revisor (servicio web).
-   - `OPENAI_API_KEY`: tu clave de OpenAI (worker). **No la pegues dentro del código ni en el navegador.**
-   - `OPENAI_MODEL`: por defecto `gpt-4.1-mini`; asegúrate de que tu cuenta tiene acceso a este modelo y que soporta `Responses API` y `Structured Outputs`.
-   - `DATABASE_URL` y `APP_SECRET`: el Blueprint los conecta/genera automáticamente.
-4. Confirma los costos de los planes que Render te muestra. El worker y PostgreSQL permanentes **no están incluidos como un único sitio estático gratuito**.
-5. Una vez desplegado, inicia sesión como `admin` con la contraseña configurada y agrega la URL de tu **conferencia matutina** con etapa **Prueba metodológica**.
-6. Si el testigo queda en **Falta transcripción**, abre su ficha e importa una transcripción SRT/VTT que incluya tiempos. El sistema encolará inmediatamente el análisis.
-7. Entra a **Mesa de revisión**, reproduce las menciones, corrige campos y aprueba. Consulta los resultados en **Analítica electoral → Pruebas**.
+**Archivo recomendado: `render.yaml` — configuración de prueba gratuita.** Lo corregimos para crear únicamente:
 
-**IMPORTANTE SOBRE YOUTUBE**: la API oficial de YouTube para descargar subtítulos requiere permisos de edición sobre el video; no puede emplearse libremente para obtener subtítulos de cualquier URL pública. El paquete `youtube-transcript-api` es no oficial y advierte que los proveedores cloud pueden sufrir bloqueos por IP. Por eso el producto NO promete la extracción automática del 100% de los videos. La alternativa SRT/VTT es parte del flujo productivo. No se usan proxies, descargas de video ni técnicas de evasión de restricciones.
+- **Web Service Free** (`observatorio-web-free`, US$0/mes dentro de los límites gratuitos).
+- **Postgres Free** (`observatorio-db-free`, US$0/mes, **caduca a los 30 días**).
+- No se crea ningún **Background Worker** pagado. El servidor web ejecuta un worker experimental en el mismo proceso mediante `app.free_server`.
+
+1. Sube esta carpeta actualizada a un repositorio GitHub **privado** y comprueba que en la raíz está el nuevo `render.yaml` con `plan: free`.
+2. En https://dashboard.render.com/ selecciona **New → Blueprint**, conecta ese repositorio y revisa antes de confirmar que ambos recursos tengan el plan **Free**.
+3. Proporciona `ADMIN_PASSWORD` y `REVIEWER_PASSWORD` fuertes, junto a tu `OPENAI_API_KEY` ya existente. No publiques la API key.
+4. Accede como `admin`. Para la prueba con la mañanera, elige la etapa **Prueba metodológica**. Si YouTube no entrega subtítulos, importa un SRT o VTT con marcas de tiempo.
+5. Confirma resultados en **Mesa de revisión** y **Analítica electoral → Pruebas**.
+
+**Advertencias muy importantes:**
+
+- Render **suspende el servicio web gratuito tras 15 minutos sin tráfico entrante** y puede reiniciarlo. El worker embebido se detiene cuando esto ocurre; en consecuencia, **no se garantiza que procese una mañanera de dos horas ni los 30 archivos diarios hasta completarlos**. Una persona puede mantener la interfaz abierta durante la prueba, pero esto no equivale a un servicio de procesamiento permanente. Si se interrumpe, revisa el estado y reintenta manualmente las tareas fallidas. Una tarea que estuviera en `running` durante una terminación abrupta podría requerir intervención para recuperarse.
+- La base de datos Postgres Free vence a los **30 días**, no tiene backups gestionados y **puede perderse**. No utilices la versión gratuita para los registros oficiales o una operación continua. Exporta regularmente los resultados.
+- Al superar los límites de recursos gratuitos, Render puede suspender los servicios si no agregas un método de pago.
+- **OpenAI API es un servicio distinto:** tus llamadas consumirán los créditos/saldo de tu cuenta de OpenAI; no necesitas otra llave ni otro pago por modelo, pero los usos siguen generando consumo.
+
+**Para operación real**, conserva el archivo `render-produccion.yaml` como referencia: es la configuración ORIGINAL con web `starter`, worker `starter` y PostgreSQL `0.5c-1g`, que son planes **de pago**. Render toma por defecto `render.yaml`, así que no debes renombrar el archivo de producción salvo que quieras deliberadamente contratar infraestructura permanente. La opción de producción requiere una estimación de costos y mecanismos de recuperación ante cortes.
 
 ## Prueba local
 
@@ -72,7 +78,7 @@ Navegador -> FastAPI/Jinja/JS -> PostgreSQL (Render)
                             +--> OpenAI Responses API (prellenado)
 ```
 
-El **worker** es persistente; la web no procesa entrevistas de dos horas mientras atiende solicitudes. El worker consulta la cola cada 3 segundos. Los trabajos se reclaman con `FOR UPDATE SKIP LOCKED` en PostgreSQL, permitiendo añadir workers en el futuro. El análisis se realiza por bloques de aproximadamente 10 minutos y guarda avances por ventana; en caso de fallo de API, el trabajo puede reintentarse manualmente.
+En **producción**, el worker independiente se ejecuta continuamente. En el **Render Free**, el worker está embebido en el web service: es experimental y se suspende junto con el servicio; no garantiza tareas largas. El worker consulta la cola cada 3 segundos mientras está activo. Los trabajos se reclaman con `FOR UPDATE SKIP LOCKED` en PostgreSQL, permitiendo añadir workers en el futuro. El análisis se realiza por bloques de aproximadamente 10 minutos y guarda avances por ventana; en caso de fallo de API, el trabajo puede reintentarse manualmente.
 
 Los registros generados por IA nunca se convierten automáticamente en aprobados. El paso de aprobación ocurre en una operación aparte que audita valor anterior y nuevo. Los modelos no calculan duraciones: el backend las deriva de las marcas temporales de los segmentos.
 
@@ -100,7 +106,9 @@ app/worker.py       Cola y procesamiento en background
 app/definitions.py  25 categorías y catálogos iniciales
 app/templates/      Pantallas del sistema
 app/static/         CSS y JavaScript
-render.yaml         Blueprint Render con web + worker + DB
+render.yaml         Blueprint de prueba Free con web + DB; worker embebido
+render-produccion.yaml Configuración original de pago (web + worker + DB)
+app/free_server.py   Punto de arranque para Render Free
 tests/              Pruebas sin llamadas externas
 ```
 

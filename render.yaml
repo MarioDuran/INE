@@ -1,22 +1,25 @@
+# DESPLIEGUE GRATUITO DE PRUEBA EN RENDER
+# No crea servicios de pago ni un worker independiente.
+# ATENCION: Render Free suspende servicios inactivos y Postgres Free vence a los 30 dias.
 databases:
-  - name: observatorio-db
+  - name: observatorio-db-free
     region: oregon
-    plan: 0.5c-1g
+    plan: free
     databaseName: observatorio
     ipAllowList: []
 services:
   - type: web
-    name: observatorio-web
+    name: observatorio-web-free
     runtime: python
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    startCommand: python -m app.free_server
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: observatorio-db
+          name: observatorio-db-free
           property: connectionString
       - key: APP_SECRET
         generateValue: true
@@ -30,19 +33,3 @@ services:
         value: gpt-4.1-mini
       - key: COOKIE_SECURE
         value: 'true'
-  - type: worker
-    name: observatorio-worker
-    runtime: python
-    region: oregon
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.worker
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: observatorio-db
-          property: connectionString
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4.1-mini
