@@ -1,0 +1,67 @@
+{% extends 'base.html' %}{% block title %}Revisión de mención{% endblock %}{% block crumb %}REVISIÓN / MENCIÓN {{ mention.id }}{% endblock %}
+{% block content %}
+<section class="page-head"><div><div class="eyebrow"><a class="quiet-link" href="/review">MESA DE REVISIÓN</a> / MENCIÓN {{ '%05d'|format(mention.id) }}</div><h1>Revisión de evidencia<span class="headline-dot">.</span></h1><p>{{ video.program or video.title }} · {{ video.date }} · {{ dict(stages).get(video.stage,video.stage) }}</p></div><span class="status {{ mention.status }} large" id="mention-status">{{ {'pending':'Pendiente de revisión','approved':'Validada','rejected':'Descartada'}.get(mention.status,mention.status) }}</span></section>
+<div class="review-columns">
+ <div class="flow-column">
+  <div class="data-panel video-box sticky-video"><div class="panel-head"><div><div class="eyebrow">FUENTE / EVIDENCIA AUDIOVISUAL</div><h2>Reproductor sincronizado</h2></div><a class="text-link" target="_blank" rel="noopener noreferrer" id="youtube-link" href="https://www.youtube.com/watch?v={{ video.youtube_id }}&t={{ mention.start|int }}s">Ver en YouTube ↗</a></div>
+   <div class="video-frame"><iframe id="youtube-frame" src="https://www.youtube-nocookie.com/embed/{{ video.youtube_id }}?start={{ (mention.start-3)|int if mention.start>3 else 0 }}&rel=0" title="Reproducción del segmento" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+   <div class="evidence-control"><div><div class="eyebrow">INTERVALO DETECTADO</div><div class="time-big"><span id="time-start">{{ '%02d:%02d:%02d'|format((mention.start//3600)|int,((mention.start%3600)//60)|int,(mention.start%60)|int) }}</span><span class="time-dash">—</span><span id="time-end">{{ '%02d:%02d:%02d'|format((mention.end//3600)|int,((mention.end%3600)//60)|int,(mention.end%60)|int) }}</span></div></div><button id="play-segment" class="btn primary" onclick="playAtStart()">▶ Escuchar fragmento</button></div>
+   <p class="tiny muted">El reproductor inicia unos segundos antes para recuperar contexto. Si YouTube no permite insertar el video, abre el enlace directo.</p></div>
+   <div class="data-panel panel-padded"><div class="panel-head"><div><div class="eyebrow">TRANSCRIPCIÓN / CONTEXTO</div><h2>Fragmentos cercanos</h2></div></div><div class="transcript-peek review-transcript">{% for s in segments %}<div class="transcript-line {% if s.ordinal in mention.evidence_segments %}highlighted{% endif %}"><button onclick="jumpTo({{ s.start|int }})">{{ '%02d:%02d:%02d'|format((s.start//3600)|int,((s.start%3600)//60)|int,(s.start%60)|int) }} ↗</button><p>{{ s.text }}</p></div>{% endfor %}</div></div>
+  </div>
+  <div class="flow-column">
+    <form id="review-form" class="data-panel panel-padded edit-panel">
+      <div class="panel-head"><div><div class="eyebrow">CODIFICACIÓN DEL INSTRUMENTO</div><h2>Ficha de análisis</h2></div><span class="count-tag">IA · {{ mention.ai_model }}</span></div>
+      <div class="section-kicker">01 / Identificación y atribución</div>
+      <div class="form-grid"><div class="form-row"><label>Quién habla<input id="speaker" value="{{ mention.speaker }}" required></label><label>De quién se habla<input id="subject" value="{{ mention.subject }}" required></label></div>
+       <div class="form-row"><label>Inicio, en segundos<input type="number" id="start" step="0.01" min="0" value="{{ mention.start }}" required></label><label>Fin, en segundos<input type="number" id="end" step="0.01" min="0" value="{{ mention.end }}" required></label></div>
+       <label>Cita textual verificada<textarea rows="3" id="quote" required>{{ mention.quote }}</textarea></label><label>Contexto detallado<textarea rows="3" id="context">{{ mention.context }}</textarea></label>
+      </div>
+      <div class="section-kicker">02 / Variables cuantitativas</div>
+      <div class="form-grid"><div class="form-row"><label>Género periodístico<select id="genre">{% for k,v in genres %}<option value="{{ k }}" {% if mention.genre==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label><label>Tema principal<select id="topic">{% for k,v in topics %}<option value="{{ k }}" {% if mention.topic==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label></div><label>Valoración metodológica<select id="tone">{% for k,v in [('neutra','Neutra'),('positiva','Positiva'),('negativa','Negativa'),('no_aplica','No aplica')] %}<option value="{{ k }}" {% if mention.tone==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label></div>
+      <div class="section-kicker">03 / Variables complementarias</div>
+      <p class="muted">Prellenado derivado del transcript. Los datos no observables deben permanecer sin especificar.</p>
+      <div id="extended-fields" class="form-grid"></div>
+      <div class="section-kicker">04 / Análisis cualitativo</div>
+      <p class="muted">Las categorías requieren evidencia textual y explicación contextual. Si un hallazgo no corresponde, elimínalo.</p>
+      <div id="findings-list" class="findings-list"></div><button type="button" class="btn light wide" onclick="addFinding()">＋ Agregar hallazgo cualitativo</button>
+      <div class="section-kicker">05 / Revisión humana</div>
+      <label class="stack-label">Observaciones del revisor<textarea id="review-note" rows="3" placeholder="Documenta correcciones, dudas o criterios aplicados...">{{ mention.review_note }}</textarea></label>
+      <div class="review-action-grid"><button type="button" class="btn light" onclick="saveReview('pending')">Guardar borrador</button><button type="button" class="btn outline-danger" onclick="saveReview('rejected')">Descartar</button><button type="button" class="btn primary" onclick="saveReview('approved')">✓ Aprobar mención</button></div>
+      <p class="tiny muted">Las ediciones se registran en la bitácora. Solo los registros aprobados forman parte de la analítica oficial.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}{% block scripts %}<script>
+const VIDEO_ID={{ video.youtube_id|tojson }}, ORIGINAL={{ mention.findings|tojson }}, EXTRA={{ mention.extra_data|tojson }}, catLabels={{ dict(categories)|tojson }};
+const extraSpec=[
+ ['speaker_gender','Género del enunciante'],['subject_gender','Género de quien es mencionado'],
+ ['speaker_role','Rol de quien habla'],['subject_role','Rol de quien es mencionado'],
+ ['party','Partido o coalición'],['candidacy','Candidatura / cargo'],
+ ['participation_type','Tipo de participación'],['source_type','Tipo de fuente'],
+ ['location','Lugar de la intervención'],['schedule','Horario'],
+ ['interruptions','Interrupciones verificables','number'],
+ ['poll_mentioned','Se presenta encuesta / sondeo','boolean'],
+ ['pollster','Empresa encuestadora'],['poll_methodology','Vitrina metodológica'],
+ ['poll_date','Fecha de publicación de encuesta'],
+ ['adjectives','Adjetivos literales (separados por |)','array'],
+ ['inclusive_language','Lenguaje incluyente'],['affirmative_action','Acción afirmativa']
+];
+(function(){let target=document.getElementById('extended-fields');
+  extraSpec.forEach(([key,label,type])=>{const wrap=document.createElement('label');wrap.textContent=label;
+    let input;if(type==='boolean'){input=document.createElement('select');[['false','No'],['true','Sí']].forEach(([v,t])=>input.add(new Option(t,v)));input.value=String(EXTRA?.[key]??false)}
+    else{input=document.createElement('input');input.type=type==='number'?'number':'text';if(type==='number')input.min='0';input.value=type==='array'?(EXTRA?.[key]||[]).join(' | '):String(EXTRA?.[key]??(type==='number'?0:'no_especificado'))}
+    input.id='ex-'+key;wrap.append(input);target.append(wrap)})
+})();
+function fmt(seconds){let s=Math.max(0,Math.floor(Number(seconds)));return [Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(x=>String(x).padStart(2,'0')).join(':')}
+function jumpTo(s,end=null){const endParam=end===null?'':`&end=${Math.max(Math.floor(s)+1,Math.ceil(end))}`;document.getElementById('youtube-frame').src=`https://www.youtube-nocookie.com/embed/${VIDEO_ID}?start=${Math.max(0,Math.floor(s))}${endParam}&autoplay=1&rel=0`;document.getElementById('youtube-link').href=`https://www.youtube.com/watch?v=${VIDEO_ID}&t=${Math.floor(s)}s`}
+function playAtStart(){jumpTo(Math.max(0,Number(document.getElementById('start').value)-3),Number(document.getElementById('end').value)+3)}
+['start','end'].forEach(x=>document.getElementById(x).addEventListener('input',e=>document.getElementById('time-'+x).textContent=fmt(e.target.value)));
+let count=0;
+function addFinding(data={}){const c=document.createElement('div');c.className='finding-edit';c.dataset.index=++count;const title=document.createElement('div');title.className='finding-head';title.innerHTML='<strong>Hallazgo cualitativo</strong>';
+const b=document.createElement('button');b.type='button';b.className='text-link';b.textContent='Eliminar ×';b.onclick=()=>c.remove();title.append(b);c.append(title);
+const label=document.createElement('label');label.textContent='Categoría';const s=document.createElement('select');s.className='finding-category';Object.entries(catLabels).forEach(([key,name])=>{let opt=new Option(name,key);if(key===data.category)opt.selected=true;s.add(opt)});label.append(s);c.append(label);
+[['evidence','Frase textual'],['explanation','Justificación metodológica']].forEach(([field,name])=>{let l=document.createElement('label');l.textContent=name;let t=document.createElement('textarea');t.className='finding-'+field;t.rows=2;t.value=data[field]||'';t.required=true;l.append(t);c.append(l)});document.getElementById('findings-list').append(c)}
+ORIGINAL.forEach(addFinding);
+async function saveReview(status){let list=[...document.querySelectorAll('.finding-edit')].map(n=>({category:n.querySelector('.finding-category').value,evidence:n.querySelector('.finding-evidence').value,explanation:n.querySelector('.finding-explanation').value}));let extra_data={};extraSpec.forEach(([key,label,type])=>{let value=document.getElementById('ex-'+key).value;extra_data[key]=type==='number'?Math.max(0,Number(value)||0):type==='boolean'?value==='true':type==='array'?value.split('|').map(x=>x.trim()).filter(Boolean):value});let payload={extra_data,start:Number(document.getElementById('start').value),end:Number(document.getElementById('end').value),speaker:document.getElementById('speaker').value,subject:document.getElementById('subject').value,quote:document.getElementById('quote').value,context:document.getElementById('context').value,genre:document.getElementById('genre').value,topic:document.getElementById('topic').value,tone:document.getElementById('tone').value,findings:list,review_note:document.getElementById('review-note').value,status};try{await api('/api/mentions/{{ mention.id }}/review',payload);toast('Registro actualizado y auditado',true);setTimeout(()=>location.href='/review?status=pending',900)}catch(err){toast(err.message)}}
+</script>{% endblock %}

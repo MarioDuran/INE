@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Panel principal{% endblock %}{% block crumb %}PANORAMA GENERAL{% endblock %}
+{% block content %}
+<section class="page-head">
+ <div><div class="eyebrow">CENTRO DE OPERACIONES / 01</div><h1>Panorama general<span class="headline-dot">.</span></h1>
+ <p>Seguimiento del procesamiento, revisión y consolidación de evidencia audiovisual.</p></div>
+ {% if user == 'admin' %}<a class="btn primary" href="/videos/new">＋ &nbsp; Agregar testigos</a>{% endif %}
+</section>
+<div class="metrics-row">
+  <div class="metric"><div class="metric-top">TESTIGOS REGISTRADOS <span>01</span></div><div class="metric-value">{{ metrics.videos }}</div><div class="metric-line blue"></div><div class="metric-desc">Grabaciones enlazadas</div></div>
+  <div class="metric"><div class="metric-top">MENCIONES DETECTADAS <span>02</span></div><div class="metric-value">{{ metrics.mentions }}</div><div class="metric-line"></div><div class="metric-desc">Propuestas automáticas</div></div>
+  <div class="metric"><div class="metric-top">POR REVISAR <span>03</span></div><div class="metric-value">{{ metrics.pending }}</div><div class="metric-line gold"></div><div class="metric-desc">Requieren validación humana</div></div>
+  <div class="metric"><div class="metric-top">MENCIONES VALIDADAS <span>04</span></div><div class="metric-value">{{ metrics.approved }}</div><div class="metric-line teal"></div><div class="metric-desc">Disponibles para informes</div></div>
+</div>
+<div class="section-toolbar"><div><div class="eyebrow">ARCHIVO DE TESTIGOS</div><h2>Grabaciones registradas</h2></div><div class="toolbar-actions"><a class="btn light" href="/review">Mesa de revisión ↗</a><a class="btn light" href="/analytics">Ver analítica ↗</a></div></div>
+<div class="data-panel">
+ {% if videos %}
+ <div class="table-scroll"><table class="data-table"><thead><tr><th>FECHA</th><th>PROGRAMA / ARCHIVO</th><th>ETAPA</th><th>MEDIO</th><th>ESTADO</th><th></th></tr></thead><tbody>
+ {% for v in videos %}<tr><td class="mono">{{ v.date }}</td><td><a class="row-title" href="/videos/{{ v.id }}">{{ v.program or v.title }}</a><div class="subline">youtube.com/watch?v={{ v.youtube_id }}</div></td><td>{{ dict(stages).get(v.stage,v.stage) }}</td><td>{{ dict(media).get(v.medium,v.medium) }}</td><td><span class="status {{ v.status }}">{{ {'queued':'En cola','fetching':'Obteniendo subtítulos','needs_transcript':'Falta transcripción','transcribed':'Transcrito','processing':'Analizando','ready':'Listo para revisión','error':'Error'}.get(v.status,v.status) }}</span></td><td><a class="table-arrow" href="/videos/{{ v.id }}">↗</a></td></tr>{% endfor %}
+ </tbody></table></div>
+ {% else %}<div class="empty-state"><div class="empty-symbol">＋</div><h3>Comienza por agregar una grabación</h3><p>El primer paso es registrar una URL pública de YouTube. La plataforma intentará obtener sus subtítulos y generará propuestas pendientes de revisión.</p>{% if user=='admin' %}<a class="btn primary" href="/videos/new">Agregar mi primera URL →</a>{% endif %}</div>{% endif %}
+</div>
+<div class="info-grid"><div class="information"><span class="information-number">01 / PROCESAMIENTO</span><h3>De la grabación a la evidencia</h3><p>La IA analiza las transcripciones segmentadas. Cada propuesta conserva la referencia temporal a su video en YouTube.</p></div><div class="information"><span class="information-number">02 / CRITERIO HUMANO</span><h3>Validar antes de informar</h3><p>Solo las menciones aprobadas se integran a los indicadores oficiales. Las pruebas metodológicas se mantienen separadas.</p></div></div>
+{% endblock %}

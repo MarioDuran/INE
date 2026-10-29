@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Acceso{% endblock %}
+{% block public %}
+<div class="login-layout">
+  <section class="login-hero">
+    <div class="login-brand"><div class="brand-mark"><span></span><span></span><span></span></div> OBSERVATORIO / MEDIOS</div>
+    <div class="hero-copy"><div class="eyebrow light">INVESTIGACIÓN · DATOS · EVIDENCIA</div>
+      <h1>Monitorear.<br>Documentar.<br><em>Comprender.</em></h1>
+      <p>Plataforma de monitoreo de medios con perspectiva de género. Inteligencia artificial para asistir; criterio humano para validar.</p>
+    </div>
+    <div class="hero-index">PROCESO ELECTORAL 2026—2027 <span>01 / SISTEMA DE ANÁLISIS</span></div>
+    <div class="hero-geometric"><i></i><i></i><i></i></div>
+  </section>
+  <section class="login-panel">
+    <div class="login-form-wrap">
+      <div class="eyebrow">ACCESO A PLATAFORMA</div>
+      <h2>Iniciar sesión</h2>
+      <p>Ingresa con tus credenciales de administración o revisión.</p>
+      {% if error %}<div class="notice danger">{{ error }}</div>{% endif %}
+      <form method="post" action="/login" class="form-grid">
+        <label>Usuario <input name="username" autocomplete="username" placeholder="admin o revisor" required></label>
+        <label>Contraseña <input type="password" name="password" autocomplete="current-password" required placeholder="••••••••••••"></label>
+        <button type="submit" class="btn primary wide">Entrar al observatorio <span>→</span></button>
+      </form>
+      <div class="login-foot">Sistema privado · Acceso restringido</div>
+    </div>
+  </section>
+</div>
+{% endblock %}
