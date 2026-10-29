@@ -1,12 +1,6 @@
-# DESPLIEGUE GRATUITO DE PRUEBA EN RENDER
-# No crea servicios de pago ni un worker independiente.
-# ATENCION: Render Free suspende servicios inactivos y Postgres Free vence a los 30 dias.
-databases:
-  - name: observatorio-db-free
-    region: oregon
-    plan: free
-    databaseName: observatorio
-    ipAllowList: []
+# Variante: Render Hobby / Free — solo un servicio nuevo.
+# Debes disponer de una base PostgreSQL YA EXISTENTE (Render o externa).
+# IMPORTANTE: requiere al menos 1 espacio libre del limite de 25 servicios.
 services:
   - type: web
     name: observatorio-web-free
@@ -18,9 +12,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: observatorio-db-free
-          property: connectionString
+        sync: false
       - key: APP_SECRET
         generateValue: true
       - key: ADMIN_PASSWORD

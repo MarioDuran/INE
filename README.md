@@ -1,3 +1,7 @@
+> **Si recibiste el error “Additional services & databases will exceed limit of 25”**: este ZIP contiene un Blueprint de **un solo servicio**. Lee primero [DESPLIEGUE-SIN-BASE-NUEVA.md](DESPLIEGUE-SIN-BASE-NUEVA.md). Requiere PostgreSQL ya existente y una plaza libre en Render.
+
+---
+
 # Observatorio de medios electorales — MVP para Render
 
 Plataforma privada de monitoreo de medios, prellenado asistido por OpenAI, revisión humana sincronizada con YouTube y analítica de registros aprobados. **No está afiliada al Tecnológico de Monterrey:** su dirección visual retoma una estética universitaria contemporánea, sin utilizar logotipos oficiales.
